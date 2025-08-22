@@ -6,6 +6,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import * as dynamoose from "dynamoose";
 /* ROUTE IMPORTS */
+import courseRoutes from "./routes/courseRoutes";
 
 /* CONFIGURATIONS */
 dotenv.config();
@@ -25,8 +26,9 @@ app.use(cors());
 
 /* ROUTES */
 app.get("/", (req, res) => {
-  res.send("Hello World");
+  res.send("API is working");
 });
+app.use("/courses", courseRoutes);
 
 /* SERVER */
 const port = process.env.PORT || 3000;
