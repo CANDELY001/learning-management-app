@@ -1,12 +1,16 @@
 "use client";
+
 import React from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { useCarousel } from "@/hooks/useCarousel";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useGetCoursesQuery } from "@/state/api";
+import { useRouter } from "next/navigation";
+import CourseCardSearch from "@/components/CourseCardSearch";
+import { useUser } from "@clerk/nextjs";
 
-// Loading Skeleton
 const LoadingSkeleton = () => {
   return (
     <div className="landing-skeleton">
@@ -41,7 +45,18 @@ const LoadingSkeleton = () => {
 };
 
 const Landing = () => {
+  const router = useRouter();
   const currentImage = useCarousel({ totalImages: 3 });
+  const { data: courses, isLoading, isError } = useGetCoursesQuery({});
+
+  const handleCourseClick = (courseId: string) => {
+    router.push(`/search?id=${courseId}`, {
+      scroll: false,
+    });
+  };
+
+  if (isLoading) return <LoadingSkeleton />;
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -84,7 +99,6 @@ const Landing = () => {
           ))}
         </div>
       </motion.div>
-
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         whileInView={{ y: 0, opacity: 1 }}
@@ -112,9 +126,9 @@ const Landing = () => {
             </span>
           ))}
         </div>
-        {/* Courses display */}
+
         <div className="landing__courses">
-          {/* {courses &&
+          {courses &&
             courses.slice(0, 4).map((course, index) => (
               <motion.div
                 key={course.courseId}
@@ -128,7 +142,7 @@ const Landing = () => {
                   onClick={() => handleCourseClick(course.courseId)}
                 />
               </motion.div>
-            ))} */}
+            ))}
         </div>
       </motion.div>
     </motion.div>
