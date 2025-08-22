@@ -7,8 +7,8 @@ import React from "react";
 
 
 const NoneDashboardNavbar = () => {
-  // const { user } = useUser();
-  // const userRole = user?.publicMetadata?.userType as "student" | "teacher";
+  const { user } = useUser();
+  const userRole = user?.publicMetadata?.userType as "student" | "teacher";
 
   return (
      <nav className="nondashboard-navbar">
@@ -40,7 +40,7 @@ const NoneDashboardNavbar = () => {
             <Bell className="nondashboard-navbar__notification-icon" />
           </button>
 
-          {/* <SignedIn>
+          <SignedIn>
             <UserButton
               appearance={{
                 baseTheme: dark,
@@ -71,7 +71,7 @@ const NoneDashboardNavbar = () => {
             >
               Sign up
             </Link>
-          </SignedOut> */}
+          </SignedOut>
         </div>
       </div>
     </nav>

@@ -12,3 +12,11 @@ export function formatPrice(cents: number | undefined): string {
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+// Predefined course categories
+export const courseCategories = [
+  { value: "technology", label: "Technology" },
+  { value: "science", label: "Science" },
+  { value: "mathematics", label: "Mathematics" },
+  { value: "artificial-intelligence", label: "Artificial Intelligence" },
+] as const;

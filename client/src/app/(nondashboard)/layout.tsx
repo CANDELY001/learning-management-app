@@ -1,5 +1,5 @@
 import NoneDashboardNavbar from "@/components/NoneDashboardNavbar";
-import Landing from "./page";
+import Landing from "./landing/page";
 import Footer from "@/components/Footer";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
