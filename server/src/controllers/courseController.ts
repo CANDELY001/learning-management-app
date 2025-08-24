@@ -1,10 +1,13 @@
 import { Request, Response } from "express";
 import Course from "../models/courseModel";
-import AWS from "aws-sdk";
+// Removed deprecated AWS SDK v2 import. Use AWS SDK v3 modules instead.
 import { v4 as uuidv4 } from "uuid";
 import { getAuth } from "@clerk/express";
 
-const s3 = new AWS.S3();
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+
+const s3 = new S3Client({ region: process.env.AWS_REGION || "us-east-2" });
 
 export const listCourses = async (
   req: Request,
@@ -177,11 +180,12 @@ export const getUploadVideoUrl = async (
     const s3Params = {
       Bucket: process.env.S3_BUCKET_NAME || "",
       Key: s3Key,
-      Expires: 60,
       ContentType: fileType,
     };
 
-    const uploadUrl = s3.getSignedUrl("putObject", s3Params);
+    const command = new PutObjectCommand(s3Params);
+    // Make sure to install @aws-sdk/s3-request-presigner if not already: npm install @aws-sdk/s3-request-presigner
+    const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 60 });
     const videoUrl = `${process.env.CLOUDFRONT_DOMAIN}/videos/${uniqueId}/${fileName}`;
 
     res.json({

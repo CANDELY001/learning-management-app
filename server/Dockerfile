@@ -10,8 +10,11 @@ COPY package*.json ./
 # Install dependencies (including dev dependencies for building)
 RUN npm install
 
+
 # Copy the rest of your application's source code
 COPY . .
+# Ensure seed data directory is included
+COPY src/seed/data ./src/seed/data
 
 # Build TypeScript files
 RUN npm run build

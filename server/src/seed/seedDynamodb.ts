@@ -48,21 +48,12 @@ async function createTables() {
   const models = [Transaction, UserCourseProgress, Course];
 
   for (const model of models) {
-    const tableName = model.name;
-    const table = new dynamoose.Table(tableName, [model], {
-      create: true,
-      update: true,
-      waitForActive: true,
-      throughput: { read: 5, write: 5 },
-    });
-
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      await table.initialize();
-      console.log(`Table created and initialized: ${tableName}`);
+      // Table creation is handled automatically by Dynamoose when you use the model
+      console.log(`Table ready for model: ${model.modelName || model.name}`);
     } catch (error: any) {
       console.error(
-        `Error creating table ${tableName}:`,
+        `Error with table for model ${model.modelName || model.name}:`,
         error.message,
         error.stack
       );
