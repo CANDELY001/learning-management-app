@@ -70,10 +70,10 @@ const AppSidebar = () => {
               <div className="app-sidebar__logo-container group">
                 <div className="app-sidebar__logo-wrapper">
                   <Image
-                    src="/logo.svg"
+                    src="/logo.png"
                     alt="logo"
-                    width={25}
-                    height={20}
+                    width={35}
+                    height={30}
                     className="app-sidebar__logo"
                   />
                   <p className="app-sidebar__title">CANDELY</p>

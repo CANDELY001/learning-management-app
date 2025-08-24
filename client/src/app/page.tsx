@@ -1,4 +1,4 @@
-import NoneDashboardNavbar from "@/components/NoneDashboardNavbar";
+import NoneDashboardNavbar from "@/components/NonDashboardNavbar";
 import Landing from "./(nondashboard)/landing/page";
 import Footer from "@/components/Footer";
 

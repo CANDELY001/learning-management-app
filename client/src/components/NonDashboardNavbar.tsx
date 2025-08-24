@@ -1,17 +1,17 @@
 "use client";
+
 import { SignedIn, SignedOut, UserButton, useUser } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import { Bell, BookOpen } from "lucide-react";
 import Link from "next/link";
 import React from "react";
 
-
-const NoneDashboardNavbar = () => {
+const NonDashboardNavbar = () => {
   const { user } = useUser();
   const userRole = user?.publicMetadata?.userType as "student" | "teacher";
 
   return (
-     <nav className="nondashboard-navbar">
+    <nav className="nondashboard-navbar">
       <div className="nondashboard-navbar__container">
         <div className="nondashboard-navbar__search">
           <Link href="/" className="nondashboard-navbar__brand" scroll={false}>
@@ -78,4 +78,4 @@ const NoneDashboardNavbar = () => {
   );
 };
 
-export default NoneDashboardNavbar;
+export default NonDashboardNavbar;
