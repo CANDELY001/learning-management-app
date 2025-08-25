@@ -50,6 +50,8 @@ export const getUserEnrolledCourses = async (
         })
       );
       courses = (batchResult.Responses?.Course as Course[]) || [];
+    } else {
+      courses = [];
     }
     // Ensure all required fields are present in each course
     const normalizedCourses = courses.map((course: any) => ({
