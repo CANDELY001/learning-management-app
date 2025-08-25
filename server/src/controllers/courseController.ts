@@ -1,13 +1,21 @@
 import { Request, Response } from "express";
-import Course from "../models/courseModel";
-// Removed deprecated AWS SDK v2 import. Use AWS SDK v3 modules instead.
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  GetCommand,
+  PutCommand,
+  UpdateCommand,
+  DeleteCommand,
+  ScanCommand,
+  DynamoDBDocumentClient,
+} from "@aws-sdk/lib-dynamodb";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from "uuid";
 import { getAuth } from "@clerk/express";
 
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-
-const s3 = new S3Client({ region: process.env.AWS_REGION || "eu-east-1" });
+const client = new DynamoDBClient({});
+const docClient = DynamoDBDocumentClient.from(client);
+const s3 = new S3Client({ region: process.env.AWS_REGION || "us-east-2" });
 
 export const listCourses = async (
   req: Request,
@@ -15,10 +23,26 @@ export const listCourses = async (
 ): Promise<void> => {
   const { category } = req.query;
   try {
-    const courses =
-      category && category !== "all"
-        ? await Course.scan("category").eq(category).exec()
-        : await Course.scan().exec();
+    let courses;
+    if (category && category !== "all") {
+      const result = await docClient.send(
+        new ScanCommand({
+          TableName: "Courses",
+          FilterExpression: "category = :cat",
+          ExpressionAttributeValues: {
+            ":cat": category,
+          },
+        })
+      );
+      courses = (result as any).Items;
+    } else {
+      const result = await docClient.send(
+        new ScanCommand({
+          TableName: "Courses",
+        })
+      );
+      courses = (result as any).Items;
+    }
     res.json({ message: "Courses retrieved successfully", data: courses });
   } catch (error) {
     res.status(500).json({ message: "Error retrieving courses", error });
@@ -28,12 +52,17 @@ export const listCourses = async (
 export const getCourse = async (req: Request, res: Response): Promise<void> => {
   const { courseId } = req.params;
   try {
-    const course = await Course.get(courseId);
+    const result = await docClient.send(
+      new GetCommand({
+        TableName: "Courses",
+        Key: { courseId },
+      })
+    );
+    const course = (result as any).Item;
     if (!course) {
       res.status(404).json({ message: "Course not found" });
       return;
     }
-
     res.json({ message: "Course retrieved successfully", data: course });
   } catch (error) {
     res.status(500).json({ message: "Error retrieving course", error });
@@ -52,7 +81,7 @@ export const createCourse = async (
       return;
     }
 
-    const newCourse = new Course({
+    const newCourse = {
       courseId: uuidv4(),
       teacherId,
       teacherName,
@@ -65,8 +94,13 @@ export const createCourse = async (
       status: "Draft",
       sections: [],
       enrollments: [],
-    });
-    await newCourse.save();
+    };
+    await docClient.send(
+      new PutCommand({
+        TableName: "Courses",
+        Item: newCourse,
+      })
+    );
 
     res.json({ message: "Course created successfully", data: newCourse });
   } catch (error) {
@@ -83,7 +117,13 @@ export const updateCourse = async (
   const { userId } = getAuth(req);
 
   try {
-    const course = await Course.get(courseId);
+    const result = await docClient.send(
+      new GetCommand({
+        TableName: "Courses",
+        Key: { courseId },
+      })
+    );
+    const course = (result as any).Item;
     if (!course) {
       res.status(404).json({ message: "Course not found" });
       return;
@@ -124,10 +164,15 @@ export const updateCourse = async (
       }));
     }
 
-    Object.assign(course, updateData);
-    await course.save();
+    const updatedCourse = { ...course, ...updateData };
+    await docClient.send(
+      new PutCommand({
+        TableName: "Courses",
+        Item: updatedCourse,
+      })
+    );
 
-    res.json({ message: "Course updated successfully", data: course });
+    res.json({ message: "Course updated successfully", data: updatedCourse });
   } catch (error) {
     res.status(500).json({ message: "Error updating course", error });
   }
@@ -141,7 +186,13 @@ export const deleteCourse = async (
   const { userId } = getAuth(req);
 
   try {
-    const course = await Course.get(courseId);
+    const result = await docClient.send(
+      new GetCommand({
+        TableName: "Courses",
+        Key: { courseId },
+      })
+    );
+    const course = (result as any).Item;
     if (!course) {
       res.status(404).json({ message: "Course not found" });
       return;
@@ -154,7 +205,12 @@ export const deleteCourse = async (
       return;
     }
 
-    await Course.delete(courseId);
+    await docClient.send(
+      new DeleteCommand({
+        TableName: "Courses",
+        Key: { courseId },
+      })
+    );
 
     res.json({ message: "Course deleted successfully", data: course });
   } catch (error) {
@@ -184,7 +240,6 @@ export const getUploadVideoUrl = async (
     };
 
     const command = new PutObjectCommand(s3Params);
-    // Make sure to install @aws-sdk/s3-request-presigner if not already: npm install @aws-sdk/s3-request-presigner
     const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 60 });
     const videoUrl = `${process.env.CLOUDFRONT_DOMAIN}/videos/${uniqueId}/${fileName}`;
 

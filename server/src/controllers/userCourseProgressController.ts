@@ -1,9 +1,18 @@
 import { Request, Response } from "express";
 import { getAuth } from "@clerk/express";
-import UserCourseProgress from "../models/userCourseProgressModel";
-import Course from "../models/courseModel";
-import { calculateOverallProgress } from "../utils/utils";
-import { mergeSections } from "../utils/utils";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  GetCommand,
+  PutCommand,
+  UpdateCommand,
+  QueryCommand,
+  BatchGetCommand,
+} from "@aws-sdk/lib-dynamodb";
+import { UserCourseProgress } from "../models/userCourseProgressModel";
+import { Course } from "../models/courseModel";
+import { calculateOverallProgress, mergeSections } from "../utils/utils";
+
+const client = new DynamoDBClient({});
 
 export const getUserEnrolledCourses = async (
   req: Request,
@@ -18,17 +27,30 @@ export const getUserEnrolledCourses = async (
   }
 
   try {
-    const enrolledCourses = await UserCourseProgress.query("userId")
-      .eq(userId)
-      .exec();
+    const enrolledResult = await client.send(
+      new QueryCommand({
+        TableName: "UserCourseProgress",
+        KeyConditionExpression: "userId = :uid",
+        ExpressionAttributeValues: {
+          ":uid": userId,
+        },
+      })
+    );
+    const enrolledCourses = enrolledResult.Items || [];
     const courseIds = enrolledCourses.map((item: any) => item.courseId);
-    if (courseIds.length === 0) {
-      res
-        .status(404)
-        .json({ message: "No enrolled courses found for this user." });
-      return;
+    let courses: Course[] = [];
+    if (courseIds.length > 0) {
+      const batchResult = await client.send(
+        new BatchGetCommand({
+          RequestItems: {
+            Course: {
+              Keys: courseIds.map((id: string) => ({ courseId: id })),
+            },
+          },
+        })
+      );
+      courses = (batchResult.Responses?.Course as Course[]) || [];
     }
-    const courses = await Course.batchGet(courseIds);
     res.json({
       message: "Enrolled courses retrieved successfully",
       data: courses,
@@ -47,7 +69,13 @@ export const getUserCourseProgress = async (
   const { userId, courseId } = req.params;
 
   try {
-    const progress = await UserCourseProgress.get({ userId, courseId });
+    const result = await client.send(
+      new GetCommand({
+        TableName: "UserCourseProgress",
+        Key: { userId, courseId },
+      })
+    );
+    const progress = result.Item as UserCourseProgress;
     if (!progress) {
       res
         .status(404)
@@ -73,18 +101,24 @@ export const updateUserCourseProgress = async (
   const progressData = req.body;
 
   try {
-    let progress = await UserCourseProgress.get({ userId, courseId });
+    const result = await client.send(
+      new GetCommand({
+        TableName: "UserCourseProgress",
+        Key: { userId, courseId },
+      })
+    );
+    let progress = result.Item as UserCourseProgress | undefined;
 
     if (!progress) {
       // If no progress exists, create initial progress
-      progress = new UserCourseProgress({
+      progress = {
         userId,
         courseId,
         enrollmentDate: new Date().toISOString(),
         overallProgress: 0,
         sections: progressData.sections || [],
         lastAccessedTimestamp: new Date().toISOString(),
-      });
+      };
     } else {
       // Merge existing progress with new progress data
       progress.sections = mergeSections(
@@ -95,7 +129,12 @@ export const updateUserCourseProgress = async (
       progress.overallProgress = calculateOverallProgress(progress.sections);
     }
 
-    await progress.save();
+    await client.send(
+      new PutCommand({
+        TableName: "UserCourseProgress",
+        Item: progress,
+      })
+    );
 
     res.json({
       message: "",

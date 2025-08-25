@@ -1,131 +1,43 @@
-import { Schema, model } from "dynamoose";
+export type CourseComment = {
+  commentId: string;
+  userId: string;
+  text: string;
+  timestamp: string;
+};
 
-const commentSchema = new Schema({
-  commentId: {
-    type: String,
-    required: true,
-  },
-  userId: {
-    type: String,
-    required: true,
-  },
-  text: {
-    type: String,
-    required: true,
-  },
-  timestamp: {
-    type: String,
-    required: true,
-  },
-});
+export type CourseChapter = {
+  chapterId: string;
+  type: "Text" | "Quiz" | "Video";
+  title: string;
+  content: string;
+  comments?: CourseComment[];
+  video?: string;
+};
 
-const chapterSchema = new Schema({
-  chapterId: {
-    type: String,
-    required: true,
-  },
-  type: {
-    type: String,
-    enum: ["Text", "Quiz", "Video"],
-    required: true,
-  },
-  title: {
-    type: String,
-    required: true,
-  },
-  content: {
-    type: String,
-    required: true,
-  },
-  comments: {
-    type: Array,
-    schema: [commentSchema],
-  },
-  video: {
-    type: String,
-  },
-});
+export type CourseSection = {
+  sectionId: string;
+  sectionTitle: string;
+  sectionDescription?: string;
+  chapters: CourseChapter[];
+};
 
-const sectionSchema = new Schema({
-  sectionId: {
-    type: String,
-    required: true,
-  },
-  sectionTitle: {
-    type: String,
-    required: true,
-  },
-  sectionDescription: {
-    type: String,
-  },
-  chapters: {
-    type: Array,
-    schema: [chapterSchema],
-  },
-});
+export type CourseEnrollment = {
+  userId: string;
+};
 
-const courseSchema = new Schema(
-  {
-    courseId: {
-      type: String,
-      hashKey: true,
-      required: true,
-    },
-    teacherId: {
-      type: String,
-      required: true,
-    },
-    teacherName: {
-      type: String,
-      required: true,
-    },
-    title: {
-      type: String,
-      required: true,
-    },
-    description: {
-      type: String,
-    },
-    category: {
-      type: String,
-      required: true,
-    },
-    image: {
-      type: String,
-    },
-    price: {
-      type: Number,
-    },
-    level: {
-      type: String,
-      required: true,
-      enum: ["Beginner", "Intermediate", "Advanced"],
-    },
-    status: {
-      type: String,
-      required: true,
-      enum: ["Draft", "Published"],
-    },
-    sections: {
-      type: Array,
-      schema: [sectionSchema],
-    },
-    enrollments: {
-      type: Array,
-      schema: [
-        new Schema({
-          userId: {
-            type: String,
-            required: true,
-          },
-        }),
-      ],
-    },
-  },
-  {
-    timestamps: true,
-  }
-);
-
-const Course = model("Course", courseSchema);
-export default Course;
+export type Course = {
+  courseId: string;
+  teacherId: string;
+  teacherName: string;
+  title: string;
+  description?: string;
+  category: string;
+  image?: string;
+  price?: number;
+  level: "Beginner" | "Intermediate" | "Advanced";
+  status: "Draft" | "Published";
+  sections: CourseSection[];
+  enrollments: CourseEnrollment[];
+  createdAt?: string;
+  updatedAt?: string;
+};

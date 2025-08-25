@@ -8,12 +8,12 @@ import {
   UpdateCommand,
   QueryCommand,
   ScanCommand,
-  DynamoDBDocumentClient,
 } from "@aws-sdk/lib-dynamodb";
+import { Course } from "../models/courseModel";
+import { Transaction } from "../models/transactionModel";
+import { UserCourseProgress } from "../models/userCourseProgressModel";
 
 const client = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(client);
-
 dotenv.config();
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -33,28 +33,22 @@ export const listTransactions = async (
   try {
     let transactions;
     if (userId) {
-      // Query for transactions by userId
-      const result = await docClient.send(
+      const result = await client.send(
         new QueryCommand({
-          TableName: "Transactions",
-          IndexName: "userId-index", // Make sure this GSI exists
+          TableName: "Transaction",
           KeyConditionExpression: "userId = :uid",
           ExpressionAttributeValues: {
             ":uid": userId,
           },
         })
       );
-      transactions = (result as any).Items;
+      transactions = result.Items || [];
     } else {
-      // Scan all transactions
-      const result = await docClient.send(
-        new ScanCommand({
-          TableName: "Transactions",
-        })
+      const result = await client.send(
+        new ScanCommand({ TableName: "Transaction" })
       );
-      transactions = (result as any).Items;
+      transactions = result.Items || [];
     }
-
     res.json({
       message: "Transactions retrieved successfully",
       data: transactions,
@@ -105,17 +99,17 @@ export const createTransaction = async (
 
   try {
     // 1. get course info
-    const courseResp = await docClient.send(
+    const courseResult = await client.send(
       new GetCommand({
-        TableName: "Courses",
+        TableName: "Course",
         Key: { courseId },
       })
     );
-    const course = courseResp.Item;
+    const course = courseResult.Item as Course;
     if (!course) throw new Error("Course not found");
 
     // 2. create transaction record
-    const transactionItem = {
+    const newTransaction: Transaction = {
       dateTime: new Date().toISOString(),
       userId,
       courseId,
@@ -123,45 +117,44 @@ export const createTransaction = async (
       amount,
       paymentProvider,
     };
-    await docClient.send(
+    await client.send(
       new PutCommand({
-        TableName: "Transactions",
-        Item: transactionItem,
+        TableName: "Transaction",
+        Item: newTransaction,
       })
     );
 
     // 3. create initial course progress
-    const initialProgressItem = {
+    const initialProgress: UserCourseProgress = {
       userId,
       courseId,
       enrollmentDate: new Date().toISOString(),
       overallProgress: 0,
-      sections: course.sections.map((section: any) => ({
+      sections: course.sections.map((section) => ({
         sectionId: section.sectionId,
-        chapters: section.chapters.map((chapter: any) => ({
+        chapters: section.chapters.map((chapter) => ({
           chapterId: chapter.chapterId,
           completed: false,
         })),
       })),
       lastAccessedTimestamp: new Date().toISOString(),
     };
-    await docClient.send(
+    await client.send(
       new PutCommand({
         TableName: "UserCourseProgress",
-        Item: initialProgressItem,
+        Item: initialProgress,
       })
     );
 
     // 4. add enrollment to relevant course
-    await docClient.send(
+    const updatedEnrollments = [...(course.enrollments || []), { userId }];
+    await client.send(
       new UpdateCommand({
-        TableName: "Courses",
+        TableName: "Course",
         Key: { courseId },
-        UpdateExpression:
-          "SET enrollments = list_append(if_not_exists(enrollments, :empty_list), :new_enrollment)",
+        UpdateExpression: "set enrollments = :enrollments",
         ExpressionAttributeValues: {
-          ":new_enrollment": [{ userId }],
-          ":empty_list": [],
+          ":enrollments": updatedEnrollments,
         },
       })
     );
@@ -169,17 +162,13 @@ export const createTransaction = async (
     res.json({
       message: "Purchased Course successfully",
       data: {
-        transaction: transactionItem,
-        courseProgress: initialProgressItem,
+        transaction: newTransaction,
+        courseProgress: initialProgress,
       },
     });
   } catch (error) {
-    console.error("Error in createTransaction:", error);
     res
       .status(500)
-      .json({
-        message: "Error creating transaction and enrollment",
-        error: (error as any)?.message || String(error),
-      });
+      .json({ message: "Error creating transaction and enrollment", error });
   }
 };
