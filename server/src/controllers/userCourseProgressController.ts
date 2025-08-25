@@ -51,9 +51,26 @@ export const getUserEnrolledCourses = async (
       );
       courses = (batchResult.Responses?.Course as Course[]) || [];
     }
+    // Ensure all required fields are present in each course
+    const normalizedCourses = courses.map((course: any) => ({
+      courseId: course.courseId || "",
+      teacherId: course.teacherId || "",
+      teacherName: course.teacherName || "",
+      title: course.title || "Untitled Course",
+      description: course.description || "",
+      category: course.category || "Uncategorized",
+      image: course.image || "",
+      price: typeof course.price === "number" ? course.price : 0,
+      level: course.level || "Beginner",
+      status: course.status || "Draft",
+      sections: Array.isArray(course.sections) ? course.sections : [],
+      enrollments: Array.isArray(course.enrollments) ? course.enrollments : [],
+      createdAt: course.createdAt || "",
+      updatedAt: course.updatedAt || "",
+    }));
     res.json({
       message: "Enrolled courses retrieved successfully",
-      data: courses,
+      data: Array.isArray(normalizedCourses) ? normalizedCourses : [],
     });
   } catch (error) {
     res
