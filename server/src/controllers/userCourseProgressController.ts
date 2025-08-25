@@ -22,13 +22,13 @@ export const getUserEnrolledCourses = async (
       .eq(userId)
       .exec();
     const courseIds = enrolledCourses.map((item: any) => item.courseId);
-    const courses = await Course.batchGet(courseIds);
-    if (!courses || courses.length === 0) {
+    if (courseIds.length === 0) {
       res
         .status(404)
-        .json({ message: "No enrolled courses found for this user" });
+        .json({ message: "No enrolled courses found for this user." });
       return;
     }
+    const courses = await Course.batchGet(courseIds);
     res.json({
       message: "Enrolled courses retrieved successfully",
       data: courses,
