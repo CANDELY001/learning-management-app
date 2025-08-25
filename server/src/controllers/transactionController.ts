@@ -174,8 +174,12 @@ export const createTransaction = async (
       },
     });
   } catch (error) {
+    console.error("Error in createTransaction:", error);
     res
       .status(500)
-      .json({ message: "Error creating transaction and enrollment", error });
+      .json({
+        message: "Error creating transaction and enrollment",
+        error: (error as any)?.message || String(error),
+      });
   }
 };
