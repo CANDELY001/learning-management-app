@@ -1,20 +1,63 @@
-export type ChapterProgress = {
-  chapterId: string;
-  completed: boolean;
-};
+import { Schema, model } from "dynamoose";
 
-export type SectionProgress = {
-  sectionId: string;
-  chapters: ChapterProgress[];
-};
+const chapterProgressSchema = new Schema({
+  chapterId: {
+    type: String,
+    required: true,
+  },
+  completed: {
+    type: Boolean,
+    required: true,
+  },
+});
 
-export type UserCourseProgress = {
-  userId: string;
-  courseId: string;
-  enrollmentDate: string;
-  overallProgress: number;
-  sections: SectionProgress[];
-  lastAccessedTimestamp: string;
-  createdAt?: string;
-  updatedAt?: string;
-};
+const sectionProgressSchema = new Schema({
+  sectionId: {
+    type: String,
+    required: true,
+  },
+  chapters: {
+    type: Array,
+    schema: [chapterProgressSchema],
+  },
+});
+
+const userCourseProgressSchema = new Schema(
+  {
+    userId: {
+      type: String,
+      hashKey: true,
+      required: true,
+    },
+    courseId: {
+      type: String,
+      rangeKey: true,
+      required: true,
+    },
+    enrollmentDate: {
+      type: String,
+      required: true,
+    },
+    overallProgress: {
+      type: Number,
+      required: true,
+    },
+    sections: {
+      type: Array,
+      schema: [sectionProgressSchema],
+    },
+    lastAccessedTimestamp: {
+      type: String,
+      required: true,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+const UserCourseProgress = model(
+  "UserCourseProgress",
+  userCourseProgressSchema
+);
+export default UserCourseProgress;

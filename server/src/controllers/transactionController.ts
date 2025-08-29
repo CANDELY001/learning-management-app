@@ -1,19 +1,10 @@
 import Stripe from "stripe";
 import dotenv from "dotenv";
 import { Request, Response } from "express";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
-  GetCommand,
-  PutCommand,
-  UpdateCommand,
-  QueryCommand,
-  ScanCommand,
-} from "@aws-sdk/lib-dynamodb";
-import { Course } from "../models/courseModel";
-import { Transaction } from "../models/transactionModel";
-import { UserCourseProgress } from "../models/userCourseProgressModel";
+import Course from "../models/courseModel";
+import Transaction from "../models/transactionModel";
+import UserCourseProgress from "../models/userCourseProgressModel";
 
-const client = new DynamoDBClient({});
 dotenv.config();
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -31,24 +22,10 @@ export const listTransactions = async (
   const { userId } = req.query;
 
   try {
-    let transactions;
-    if (userId) {
-      const result = await client.send(
-        new QueryCommand({
-          TableName: "Transaction",
-          KeyConditionExpression: "userId = :uid",
-          ExpressionAttributeValues: {
-            ":uid": userId,
-          },
-        })
-      );
-      transactions = result.Items || [];
-    } else {
-      const result = await client.send(
-        new ScanCommand({ TableName: "Transaction" })
-      );
-      transactions = result.Items || [];
-    }
+    const transactions = userId
+      ? await Transaction.query("userId").eq(userId).exec()
+      : await Transaction.scan().exec();
+
     res.json({
       message: "Transactions retrieved successfully",
       data: transactions,
@@ -99,64 +76,44 @@ export const createTransaction = async (
 
   try {
     // 1. get course info
-    const courseResult = await client.send(
-      new GetCommand({
-        TableName: "Course",
-        Key: { courseId },
-      })
-    );
-    const course = courseResult.Item as Course;
-    if (!course) throw new Error("Course not found");
+    const course = await Course.get(courseId);
 
     // 2. create transaction record
-    const newTransaction: Transaction = {
+    const newTransaction = new Transaction({
       dateTime: new Date().toISOString(),
       userId,
       courseId,
       transactionId,
       amount,
       paymentProvider,
-    };
-    await client.send(
-      new PutCommand({
-        TableName: "Transaction",
-        Item: newTransaction,
-      })
-    );
+    });
+    await newTransaction.save();
 
     // 3. create initial course progress
-    const initialProgress: UserCourseProgress = {
+    const initialProgress = new UserCourseProgress({
       userId,
       courseId,
       enrollmentDate: new Date().toISOString(),
       overallProgress: 0,
-      sections: course.sections.map((section) => ({
+      sections: course.sections.map((section: any) => ({
         sectionId: section.sectionId,
-        chapters: section.chapters.map((chapter) => ({
+        chapters: section.chapters.map((chapter: any) => ({
           chapterId: chapter.chapterId,
           completed: false,
         })),
       })),
       lastAccessedTimestamp: new Date().toISOString(),
-    };
-    await client.send(
-      new PutCommand({
-        TableName: "UserCourseProgress",
-        Item: initialProgress,
-      })
-    );
+    });
+    await initialProgress.save();
 
     // 4. add enrollment to relevant course
-    const updatedEnrollments = [...(course.enrollments || []), { userId }];
-    await client.send(
-      new UpdateCommand({
-        TableName: "Course",
-        Key: { courseId },
-        UpdateExpression: "set enrollments = :enrollments",
-        ExpressionAttributeValues: {
-          ":enrollments": updatedEnrollments,
+    await Course.update(
+      { courseId },
+      {
+        $ADD: {
+          enrollments: [{ userId }],
         },
-      })
+      }
     );
 
     res.json({
