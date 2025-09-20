@@ -8,7 +8,7 @@ import path from "path";
 import dynamoose from "dynamoose";
 import pluralize from "pluralize";
 import Transaction from "../models/transactionModel";
-import Course from "../models/courseModel";
+import type { Course } from "../models/courseModel";
 import UserCourseProgress from "../models/userCourseProgressModel";
 import dotenv from "dotenv";
 

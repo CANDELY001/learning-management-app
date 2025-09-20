@@ -1,10 +1,20 @@
 import { Request, Response } from "express";
-import Course from "../models/courseModel";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  GetCommand,
+  PutCommand,
+  UpdateCommand,
+  DeleteCommand,
+  ScanCommand,
+  QueryCommand,
+} from "@aws-sdk/lib-dynamodb";
 import { S3, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from "uuid";
 import { getAuth } from "@clerk/express";
+import type { Course } from "../models/courseModel";
 
+const client = new DynamoDBClient({});
 const s3 = new S3();
 
 export const listCourses = async (
@@ -13,10 +23,24 @@ export const listCourses = async (
 ): Promise<void> => {
   const { category } = req.query;
   try {
-    const courses =
-      category && category !== "all"
-        ? await Course.scan("category").eq(category).exec()
-        : await Course.scan().exec();
+    let courses;
+    if (category && category !== "all") {
+      const result = await client.send(
+        new ScanCommand({
+          TableName: "Courses",
+          FilterExpression: "category = :cat",
+          ExpressionAttributeValues: {
+            ":cat": category,
+          },
+        })
+      );
+      courses = result.Items || [];
+    } else {
+      const result = await client.send(
+        new ScanCommand({ TableName: "Courses" })
+      );
+      courses = result.Items || [];
+    }
     res.json({ message: "Courses retrieved successfully", data: courses });
   } catch (error) {
     res.status(500).json({ message: "Error retrieving courses", error });
@@ -26,12 +50,17 @@ export const listCourses = async (
 export const getCourse = async (req: Request, res: Response): Promise<void> => {
   const { courseId } = req.params;
   try {
-    const course = await Course.get(courseId);
+    const result = await client.send(
+      new GetCommand({
+        TableName: "Courses",
+        Key: { courseId },
+      })
+    );
+    const course = result.Item ? (result.Item as Course) : null;
     if (!course) {
       res.status(404).json({ message: "Course not found" });
       return;
     }
-
     res.json({ message: "Course retrieved successfully", data: course });
   } catch (error) {
     res.status(500).json({ message: "Error retrieving course", error });
@@ -50,7 +79,7 @@ export const createCourse = async (
       return;
     }
 
-    const newCourse = new Course({
+    const newCourse: Course = {
       courseId: uuidv4(),
       teacherId,
       teacherName,
@@ -63,9 +92,15 @@ export const createCourse = async (
       status: "Draft",
       sections: [],
       enrollments: [],
-    });
-    await newCourse.save();
-
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await client.send(
+      new PutCommand({
+        TableName: "Courses",
+        Item: newCourse,
+      })
+    );
     res.json({ message: "Course created successfully", data: newCourse });
   } catch (error) {
     res.status(500).json({ message: "Error creating course", error });
@@ -81,7 +116,13 @@ export const updateCourse = async (
   const { userId } = getAuth(req);
 
   try {
-    const course = await Course.get(courseId);
+    const result = await client.send(
+      new GetCommand({
+        TableName: "Courses",
+        Key: { courseId },
+      })
+    );
+    const course = result.Item as Course;
     if (!course) {
       res.status(404).json({ message: "Course not found" });
       return;
@@ -122,10 +163,18 @@ export const updateCourse = async (
       }));
     }
 
-    Object.assign(course, updateData);
-    await course.save();
-
-    res.json({ message: "Course updated successfully", data: course });
+    const updatedCourse = {
+      ...course,
+      ...updateData,
+      updatedAt: new Date().toISOString(),
+    };
+    await client.send(
+      new PutCommand({
+        TableName: "Courses",
+        Item: updatedCourse,
+      })
+    );
+    res.json({ message: "Course updated successfully", data: updatedCourse });
   } catch (error) {
     res.status(500).json({ message: "Error updating course", error });
   }
@@ -139,7 +188,13 @@ export const deleteCourse = async (
   const { userId } = getAuth(req);
 
   try {
-    const course = await Course.get(courseId);
+    const result = await client.send(
+      new GetCommand({
+        TableName: "Courses",
+        Key: { courseId },
+      })
+    );
+    const course = result.Item as Course;
     if (!course) {
       res.status(404).json({ message: "Course not found" });
       return;
@@ -152,8 +207,12 @@ export const deleteCourse = async (
       return;
     }
 
-    await Course.delete(courseId);
-
+    await client.send(
+      new DeleteCommand({
+        TableName: "Courses",
+        Key: { courseId },
+      })
+    );
     res.json({ message: "Course deleted successfully", data: course });
   } catch (error) {
     res.status(500).json({ message: "Error deleting course", error });

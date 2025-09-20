@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import dotenv from "dotenv";
 import { Request, Response } from "express";
-import Course from "../models/courseModel";
+import type { Course } from "../models/courseModel";
 import Transaction from "../models/transactionModel";
 import UserCourseProgress from "../models/userCourseProgressModel";
 
